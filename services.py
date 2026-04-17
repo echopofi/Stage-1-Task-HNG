@@ -22,18 +22,16 @@ async def fetch_profile_data(name: str):
     async with httpx.AsyncClient(timeout=15.0) as client:
         try:    
             responses = await asyncio.gather(
-            client.get(urls["Genderize"]),
-            client.get(urls["Agify"]),
-            client.get(urls["Nationalize"])
-        )
-            for i, res in enumerate(responses):
-                api_name = list(urls.keys())[i]
-                return api_name, None
-            
+                client.get(urls["Genderize"]),
+                client.get(urls["Agify"]),
+                client.get(urls["Nationalize"])
+            )
         except (httpx.RequestError, httpx.TimeoutException):
             return "External API", None
 
-        gen_data, agi_data, nat_data = [r.json() for r in responses]
+        gen_data = responses[0].json()
+        agi_data = responses[1].json()
+        nat_data = responses[2].json()
 
         if not gen_data.get("gender") or gen_data.get("count") == 0:
             return "Genderize", None
