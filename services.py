@@ -26,8 +26,11 @@ async def fetch_profile_data(name: str):
             client.get(urls["Agify"]),
             client.get(urls["Nationalize"])
         )
+            for i, res in enumerate(responses):
+                api_name = list(urls.keys())[i]
+                return api_name, None
             
-        except httpx.RequestError:
+        except (httpx.RequestError, httpx.TimeoutException):
             return "External API", None
 
         gen_data, agi_data, nat_data = [r.json() for r in responses]

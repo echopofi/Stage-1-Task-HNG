@@ -1,9 +1,13 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 import models, services
 from models import SessionLocal, init_db
 from contextlib import asynccontextmanager
+
+
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -11,6 +15,14 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
+
+@app.exception_handler(HTTPException)
+async def custom_http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=exc.detail if isinstance(exc.detail, dict) else {"message": exc.detail}
+    )
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -87,7 +99,7 @@ def get_all_profiles(
     return {
         "status": "success",
         "count": len(profiles),
-        "data": profiles
+        "data": [profile for profile in profiles]
     }
 
 @app.get("/api/profiles/{profile_id}")
@@ -105,20 +117,6 @@ def get_profile(profile_id: str, db: Session = Depends(get_db)):
         "data": profile
     }
 
-@app.delete("/api/profiles/{profile_id}", status_code=204)
-def delete_profile(profile_id: str, db: Session = Depends(get_db)):
-    profile = db.query(models.Profile).filter(models.Profile.id == profile_id).first()
-
-    if not profile:
-        raise HTTPException(status_code=404, 
-                            detail={"status": "error", 
-                                     "message": "Profile not found"
-                                    })
-    
-    db.delete(profile)
-    db.commit()
-
-    return None
 
 @app.delete("/api/profiles/{id}", status_code=204)
 def delete_profiles(id: str, db: Session = Depends(get_db)):
