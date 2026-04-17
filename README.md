@@ -25,9 +25,3 @@ A high-performance FastAPI backend that aggregates data from multiple external A
 4. Data is aggregated, categorized (Age Grouping), and persisted.
 5. **JSON Response** is returned with a status of 201.
 
-## 📥 Installation & Setup
-
-1. **Clone the repository**:
-   ```bash
-   git clone github.com/echopofi
-   cd <project-folder>
