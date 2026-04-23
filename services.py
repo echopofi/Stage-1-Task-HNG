@@ -1,5 +1,6 @@
 import httpx
 import asyncio
+from models import COUNTRY_MAP
 
 
 def get_age_group(age:int) -> str:
@@ -43,6 +44,8 @@ async def fetch_profile_data(name: str):
             return "Nationalize", None
         
         top_country = max(nat_data["country"], key=lambda x: x["probability"])
+        country_id = top_country["country_id"]
+        country_name = COUNTRY_MAP.get(country_id, country_id)
 
         return None, {
             "gender": gen_data["gender"],
@@ -50,6 +53,7 @@ async def fetch_profile_data(name: str):
             "sample_size": gen_data["count"],
             "age": agi_data["age"],
             "age_group": get_age_group(agi_data["age"]),
-            "country_id": top_country["country_id"],
+            "country_id": country_id,
+            "country_name": country_name,
             "country_probability": top_country["probability"],
         }

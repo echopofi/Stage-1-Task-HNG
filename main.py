@@ -1,10 +1,12 @@
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import asc, desc
 import models, services
 from models import SessionLocal, init_db
 from contextlib import asynccontextmanager
+import re
 
 
 
@@ -83,6 +85,14 @@ def get_all_profiles(
     gender: str = None,
     country_id: str = None,
     age_group: str = None,
+    min_age: int = None,
+    max_age: int = None,
+    min_gender_probability: float = None,
+    min_country_probability: float = None,
+    sort_by: str = None,
+    order: str = "asc",
+    page: int = 1,
+    limit: int = 10,
     db: Session = Depends(get_db)
 ):
     query = db.query(models.Profile)
@@ -93,12 +103,113 @@ def get_all_profiles(
         query = query.filter(models.Profile.country_id.ilike(country_id))
     if age_group:
         query = query.filter(models.Profile.age_group.ilike(age_group))
+    if min_age is not None:
+        query = query.filter(models.Profile.age >= min_age)
+    if max_age is not None:
+        query = query.filter(models.Profile.age <= max_age)
+    if min_gender_probability is not None:
+        query = query.filter(models.Profile.gender_probability >= min_gender_probability)
+    if min_country_probability is not None:
+        query = query.filter(models.Profile.country_probability >= min_country_probability)
 
-    profiles = query.all()
+    total = query.count()
+
+    if sort_by:
+        sort_column = {
+            "age": models.Profile.age,
+            "created_at": models.Profile.created_at,
+            "gender_probability": models.Profile.gender_probability,
+        }.get(sort_by)
+        if sort_column:
+            if order == "desc":
+                query = query.order_by(desc(sort_column))
+            else:
+                query = query.order_by(asc(sort_column))
+
+    if limit > 50:
+        limit = 50
+    offset = (page - 1) * limit
+    profiles = query.offset(offset).limit(limit).all()
 
     return {
         "status": "success",
-        "count": len(profiles),
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "data": [profile for profile in profiles]
+    }
+
+@app.get("/api/profiles/search")
+def search_profiles(
+    q: str = Query(..., description="Natural language search query"),
+    page: int = 1,
+    limit: int = 10,
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Profile)
+    filters = {}
+    
+    q_lower = q.lower()
+    
+    if "male" in q_lower or "males" in q_lower:
+        filters["gender"] = "male"
+    elif "female" in q_lower or "females" in q_lower:
+        filters["gender"] = "female"
+    
+    if "young" in q_lower:
+        filters["min_age"] = 16
+        filters["max_age"] = 24
+    elif "above" in q_lower:
+        match = re.search(r"above\s*(\d+)", q_lower)
+        if match:
+            filters["min_age"] = int(match.group(1))
+    elif "below" in q_lower:
+        match = re.search(r"below\s*(\d+)", q_lower)
+        if match:
+            filters["max_age"] = int(match.group(1))
+    
+    for country_code, country_name in models.COUNTRY_MAP.items():
+        if country_name.lower() in q_lower or country_code.lower() in q_lower:
+            filters["country_id"] = country_code
+            break
+    
+    if "child" in q_lower:
+        filters["age_group"] = "child"
+    elif "teenager" in q_lower:
+        filters["age_group"] = "teenager"
+    elif "adult" in q_lower:
+        filters["age_group"] = "adult"
+    elif "senior" in q_lower:
+        filters["age_group"] = "senior"
+    
+    if not filters:
+        raise HTTPException(status_code=400,
+                          detail={"status": "error",
+                                   "message": "Unable to interpret query"})
+    
+    if "gender" in filters:
+        query = query.filter(models.Profile.gender.ilike(filters["gender"]))
+    if "country_id" in filters:
+        query = query.filter(models.Profile.country_id.ilike(filters["country_id"]))
+    if "age_group" in filters:
+        query = query.filter(models.Profile.age_group.ilike(filters["age_group"]))
+    if "min_age" in filters:
+        query = query.filter(models.Profile.age >= filters["min_age"])
+    if "max_age" in filters:
+        query = query.filter(models.Profile.age <= filters["max_age"])
+    
+    total = query.count()
+    
+    if limit > 50:
+        limit = 50
+    offset = (page - 1) * limit
+    profiles = query.offset(offset).limit(limit).all()
+
+    return {
+        "status": "success",
+        "page": page,
+        "limit": limit,
+        "total": total,
         "data": [profile for profile in profiles]
     }
 
