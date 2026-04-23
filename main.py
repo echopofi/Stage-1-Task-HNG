@@ -114,6 +114,9 @@ def get_all_profiles(
 
     total = query.count()
 
+    if not sort_by:
+        query = query.order_by(asc(models.Profile.created_at))
+    
     if sort_by:
         sort_column = {
             "age": models.Profile.age,
@@ -173,14 +176,10 @@ def search_profiles(
             filters["country_id"] = country_code
             break
     
-    if "child" in q_lower:
-        filters["age_group"] = "child"
-    elif "teenager" in q_lower:
-        filters["age_group"] = "teenager"
-    elif "adult" in q_lower:
-        filters["age_group"] = "adult"
-    elif "senior" in q_lower:
-        filters["age_group"] = "senior"
+    for ag in ["child", "teenager", "adult", "senior"]:
+        if ag in q_lower:
+            filters["age_group"] = ag
+            break
     
     if not filters:
         raise HTTPException(status_code=400,
