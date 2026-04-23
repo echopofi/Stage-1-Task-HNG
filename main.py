@@ -118,16 +118,20 @@ def get_all_profiles(
         query = query.order_by(asc(models.Profile.created_at))
     
     if sort_by:
+        valid_sort_fields = {"age", "created_at", "gender_probability"}
+        if sort_by not in valid_sort_fields:
+            raise HTTPException(status_code=400,
+                              detail={"status": "error",
+                                       "message": "Invalid query parameters"})
         sort_column = {
             "age": models.Profile.age,
             "created_at": models.Profile.created_at,
             "gender_probability": models.Profile.gender_probability,
         }.get(sort_by)
-        if sort_column:
-            if order == "desc":
-                query = query.order_by(desc(sort_column))
-            else:
-                query = query.order_by(asc(sort_column))
+        if order == "desc":
+            query = query.order_by(desc(sort_column))
+        else:
+            query = query.order_by(asc(sort_column))
 
     if limit > 50:
         limit = 50
@@ -149,15 +153,25 @@ def search_profiles(
     limit: int = 10,
     db: Session = Depends(get_db)
 ):
+    if not q or not q.strip():
+        raise HTTPException(status_code=400,
+                          detail={"status": "error",
+                                   "message": "Invalid query parameters"})
+    
     query = db.query(models.Profile)
     filters = {}
     
     q_lower = q.lower()
     
-    if "male" in q_lower or "males" in q_lower:
+    gender_filter_applied = False
+    if ("male" in q_lower or "males" in q_lower) and ("female" in q_lower or "females" in q_lower):
+        gender_filter_applied = False
+    elif "male" in q_lower or "males" in q_lower:
         filters["gender"] = "male"
+        gender_filter_applied = True
     elif "female" in q_lower or "females" in q_lower:
         filters["gender"] = "female"
+        gender_filter_applied = True
     
     if "young" in q_lower:
         filters["min_age"] = 16
@@ -171,23 +185,32 @@ def search_profiles(
         if match:
             filters["max_age"] = int(match.group(1))
     
+    query_words = set(q_lower.replace(",", " ").replace("from", " ").replace("of", " ").split())
+    
     for country_code, country_name in models.COUNTRY_MAP.items():
-        if country_name.lower() in q_lower or country_code.lower() in q_lower:
+        if country_code.lower() in query_words or country_name.lower() in query_words:
             filters["country_id"] = country_code
             break
     
     for ag in ["child", "teenager", "adult", "senior"]:
-        if ag in q_lower:
+        if ag in query_words:
             filters["age_group"] = ag
             break
     
-    if not filters:
+    valid_keywords = set()
+    valid_keywords.update(["male", "males", "female", "females", "young", "above", "below", "child", "teenager", "adult", "senior"])
+    valid_keywords.update([c.lower() for c in models.COUNTRY_MAP.keys()])
+    valid_keywords.update([n.lower() for n in models.COUNTRY_MAP.values()])
+    
+    if not filters or not query_words.intersection(valid_keywords):
         raise HTTPException(status_code=400,
                           detail={"status": "error",
                                    "message": "Unable to interpret query"})
     
-    if "gender" in filters:
-        query = query.filter(models.Profile.gender.ilike(filters["gender"]))
+    if "gender" in filters and filters["gender"] is not None:
+        query = query.filter(models.Profile.gender == filters["gender"])
+    if "gender" in filters and filters["gender"] is None:
+        pass
     if "country_id" in filters:
         query = query.filter(models.Profile.country_id.ilike(filters["country_id"]))
     if "age_group" in filters:

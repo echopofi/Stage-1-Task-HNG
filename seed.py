@@ -90,11 +90,13 @@ def seed_database(num_profiles=2026):
             country_probability=round(random.uniform(0.1, 0.9), 2)
         )
         db.add(profile)
-        db.commit()
-        created += 1
         
         if created % 100 == 0:
+            db.commit()
             print(f"Created {created} profiles...")
+        created += 1
+    
+    db.commit()
     
     db.close()
     print(f"Created {created} profiles total")
