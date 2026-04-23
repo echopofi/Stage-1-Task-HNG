@@ -1,0 +1,9 @@
+INFO:     Started server process [1711568]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:56928 - "GET /api/profiles/search?q=asdfgh HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:56932 - "GET /api/profiles/search?q=young%20males%20from%20nigeria HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43592 - "GET /api/profiles?sort_by=age&order=desc&page=1&limit=5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43600 - "GET /api/profiles?gender=male&country_id=NG&min_age=25&page=1&limit=5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34354 - "GET /api/profiles?page=1&limit=5 HTTP/1.1" 200 OK
