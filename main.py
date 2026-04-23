@@ -14,6 +14,65 @@ import re
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    db = SessionLocal()
+    existing = db.query(models.Profile).count()
+    if existing < 2026:
+        import random
+        from uuid6 import uuid7
+        from models import COUNTRY_MAP
+        
+        MALE_FIRST_NAMES = ["James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph", "Thomas", "Charles", "Christopher", "Daniel", "Matthew", "Anthony", "Mark", "Donald", "Steven", "Paul", "Andrew", "Joshua", "Kenneth", "Kevin", "Brian", "George"]
+        FEMALE_FIRST_NAMES = ["Mary", "Jennifer", "Linda", "Patricia", "Barbara", "Susan", "Jessica", "Sarah", "Karen", "Lisa", "Nancy", "Betty", "Margaret", "Sandra", "Ashley", "Kimberly", "Emily", "Donna", "Michelle", "Dorothy", "Carol", "Amanda", "Melissa", "Deborah"]
+        LAST_NAMES = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin"]
+        
+        def get_age_group(age):
+            if age <= 12: return "child"
+            elif age <= 19: return "teenager"
+            elif age <= 59: return "adult"
+            else: return "senior"
+        
+        country_ids = list(COUNTRY_MAP.keys())
+        all_names = {p[0] for p in db.query(models.Profile.name).all()}
+        profiles_to_add = []
+        
+        while len(profiles_to_add) + existing < 2026:
+            gender = random.choice(["male", "female"])
+            first = random.choice(MALE_FIRST_NAMES if gender == "male" else FEMALE_FIRST_NAMES)
+            last = random.choice(LAST_NAMES)
+            suffix = random.randint(1, 9999)
+            name = f"{first} {last} {suffix}"
+            
+            if name in all_names:
+                all_names.add(name)
+                continue
+            
+            all_names.add(name)
+            age = random.randint(1, 85)
+            country_id = random.choice(country_ids)
+            
+            profile = models.Profile(
+                id=str(uuid7()),
+                name=name,
+                gender=gender,
+                gender_probability=round(random.uniform(0.5, 1.0), 2),
+                age=age,
+                age_group=get_age_group(age),
+                country_id=country_id,
+                country_name=COUNTRY_MAP.get(country_id, country_id),
+                country_probability=round(random.uniform(0.1, 0.9), 2)
+            )
+            profiles_to_add.append(profile)
+            
+            if len(profiles_to_add) >= 100:
+                db.bulk_save_objects(profiles_to_add)
+                db.commit()
+                profiles_to_add = []
+        
+        if profiles_to_add:
+            db.bulk_save_objects(profiles_to_add)
+            db.commit()
+    
+    db.close()
     yield
 
 app = FastAPI(lifespan=lifespan)
